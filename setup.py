@@ -2,8 +2,8 @@ from distutils.core import setup
 
 setup(
     name="cc3200tool",
-    version="0.1.1",
-    description="A tool for CC32xx TI micro firmware update",
+    version="1.0.0",
+    description="A tool to upload files to TI CC32xx",
     author="Kiril Zyapkov",
     author_email="k.zyapkov@allterco.com",
     url="http://github.com/AlexLisnitski/cc3200tool",
