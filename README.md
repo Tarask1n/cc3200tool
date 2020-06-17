@@ -30,7 +30,7 @@ described in TI's Application Note [CC3100/CC3200 Embedded Programming](http://w
 
 ## Installation
 
-This runs on Python 2.7 with recent [pySerial](https://github.com/pyserial/pyserial).
+This runs on Python >=3.6 with recent [pySerial](https://github.com/pyserial/pyserial).
 
 To install, if you have pip and want system-wide:
 
