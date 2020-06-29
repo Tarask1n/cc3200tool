@@ -539,7 +539,7 @@ class CC3x00SffsInfo(object):
             fname = fat_header.fat_bytes[fo_abs:fo_abs + fname_len]
 
             entry = CC3x00SffsStatsFileEntry(i, start_block, size_blocks,
-                                             mirrored, flags, fname)
+                                             mirrored, flags, fname.decode('ascii'))
             self.files.append(entry)
 
             occupied_block_snippets.append((start_block, entry.total_blocks))
