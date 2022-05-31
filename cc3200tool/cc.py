@@ -841,7 +841,7 @@ class CC3200Connection(object):
         assert len(response) == 4
         status = 0
         for b in response:
-            status = (status << 8) + ord(b)
+            status = (status << 8) + b
         #log.info('FS programming request: %d, response %s: %d', len(chunk), hexify(response), status)
         return status
 
