@@ -60,6 +60,7 @@ OPCODE_GET_STORAGE_INFO = b'\x31'
 OPCODE_EXEC_FROM_RAM = b'\x32'
 OPCODE_SWITCH_2_APPS = b'\x33'
 OPCODE_FS_PROGRAMMING = b'\x34'
+OPCODE_GET_MAC_ADDRESS = b'\x3A'
 
 STORAGE_ID_SRAM = 0x0
 STORAGE_ID_SFLASH = 0x2
@@ -361,6 +362,19 @@ class CC3x00VersionInfo(object):
             self.bootloader, self.nwp, self.mac, self.phy, self.chip_type)
 
 
+class CC3x00MacInfo(object):
+    def __init__(self, mac: str, prog_mac: str):
+        self.mac = mac
+        self.prog_mac = prog_mac
+
+    @classmethod
+    def from_bytes(cls, mac: bytes, prog_mac: bytes):
+        return cls(mac.hex(':'), prog_mac.hex(':'))
+
+    def __repr__(self):
+        return f'CC3x00MacInfo(MAC: {self.mac}, PROG_MAC: {self.prog_mac})'
+
+
 class CC3x00StorageList(object):
     FLASH_BIT = 0x02
     SFLASH_BIT = 0x04
@@ -618,6 +632,7 @@ class CC3200Connection(object):
 
         self.vinfo = None
         self.vinfo_apps = None
+        self.minfo = None
 
     @contextmanager
     def _serial_timeout(self, timeout=None):
@@ -766,6 +781,7 @@ class CC3200Connection(object):
 
 
     def _try_breaking(self, tries=7, timeout=2):
+        break_cycles = 10
         if platform.system() == 'Darwin': # For mac os
             break_cycles = 3
         elif platform.system() == 'Linux':
@@ -786,6 +802,20 @@ class CC3200Connection(object):
         if len(version_data) != 28:
             raise CC3200Error(f"Version info should be 28 bytes, got {len(version_data)}")
         return CC3x00VersionInfo.from_packet(version_data)
+
+    def _get_mac_address(self):
+        self._send_packet(OPCODE_GET_MAC_ADDRESS + int.to_bytes(0, 4, byteorder='big'))
+        mac_data = self._read_packet()
+        if len(mac_data) != 6:
+            raise CC3200Error(f"MAC info should be 6 bytes, got {len(mac_data)}")
+        try:
+            self._send_packet(
+                OPCODE_GET_MAC_ADDRESS + int.to_bytes(1, 4, byteorder='big'), timeout=5)
+        except CC3200Error:
+            prog_mac_data = b''
+        else:
+            prog_mac_data = self._read_packet()
+        return CC3x00MacInfo.from_bytes(mac_data, prog_mac_data)
 
     def _get_storage_list(self):
         log.info("Getting storage list...")
@@ -1069,6 +1099,7 @@ class CC3200Connection(object):
             self.vinfo_apps = self._get_version()
             if self.vinfo.bootloader[1] >= 4:
                 break
+        self.minfo = self._get_mac_address()
 
     def format_slfs(self, size=None):
         if size is None:
@@ -1391,6 +1422,8 @@ def main():
             sys.exit(0)
         cc.switch_to_nwp_bootloader()
         log.info("APPS version: %s", cc.vinfo_apps)
+
+    log.info(f'MAC info: {cc.minfo}')
 
     check_fat = False
 
