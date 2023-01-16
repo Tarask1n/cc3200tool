@@ -1219,7 +1219,27 @@ class CC3200Connection(object):
 
     def write_flash(self, image, erase=True):
         data = image.read()
+        image.close()
+
+        image_ext = image.name.rsplit('.', maxsplit=1)[-1].lower()
+        if image_ext not in ('ucf', 'sli'):
+            log.info(f'Unexpected filename extension: {image_ext}. Supported '
+                     'SLI or UCF. Will be considered as UCF.')
+            image_ext = 'ucf'
+        if image_ext == 'sli':
+            ucf_pos = data.find(b'Programming.ucf')
+            if ucf_pos == -1:
+                log.info('FS programming aborted, UCF not found in SLI image.')
+                return
+            ucf_pos += 0x200
+            ucf_len_bytes = data[ucf_pos: ucf_pos + 4]
+            ucf_len = int.from_bytes(ucf_len_bytes, byteorder='little') + 0x0c
+            data = data[ucf_pos: ucf_pos + ucf_len]
+
         data_len = len(data)
+        if data_len != int.from_bytes(data[0:4], byteorder='little') + 0x0c:
+            log.info('FS programming aborted, incorrect UCF structure length.')
+            return
 
         if self.vinfo.bootloader[1] >= 4:
             if erase:
