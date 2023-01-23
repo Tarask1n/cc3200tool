@@ -804,18 +804,21 @@ class CC3200Connection(object):
         return CC3x00VersionInfo.from_packet(version_data)
 
     def _get_mac_address(self):
-        self._send_packet(OPCODE_GET_MAC_ADDRESS + int.to_bytes(0, 4, byteorder='big'))
-        mac_data = self._read_packet()
-        if len(mac_data) != 6:
-            raise CC3200Error(f"MAC info should be 6 bytes, got {len(mac_data)}")
-        try:
-            self._send_packet(
-                OPCODE_GET_MAC_ADDRESS + int.to_bytes(1, 4, byteorder='big'), timeout=5)
-        except CC3200Error:
-            prog_mac_data = b''
-        else:
-            prog_mac_data = self._read_packet()
-        return CC3x00MacInfo.from_bytes(mac_data, prog_mac_data)
+        mac_data = [b'', b'']
+        for ind in range(2):
+            try:
+                self._send_packet(OPCODE_GET_MAC_ADDRESS + int.to_bytes(
+                    ind, 4, byteorder='big'), timeout=5)
+                mac_data[ind] = self._read_packet()
+            except CC3200Error:
+                log.info(f"Could not read MAC{('', ' PROD')[ind]} from device")
+                mac_data[ind] = b''
+            else:
+                if len(mac_data[ind]) != 6:
+                    log.info(f"MAC{('', ' PROD')[ind]} info should be 6 bytes, got "
+                             f"{len(mac_data[ind])}. {mac_data[ind].hex(' ')}")
+                    mac_data[ind] = b''
+        return CC3x00MacInfo.from_bytes(*mac_data)
 
     def _get_storage_list(self):
         log.info("Getting storage list...")
@@ -1222,10 +1225,6 @@ class CC3200Connection(object):
         image.close()
 
         image_ext = image.name.rsplit('.', maxsplit=1)[-1].lower()
-        if image_ext not in ('ucf', 'sli'):
-            log.info(f'Unexpected filename extension: {image_ext}. Supported '
-                     'SLI or UCF. Will be considered as UCF.')
-            image_ext = 'ucf'
         if image_ext == 'sli':
             ucf_pos = data.find(b'Programming.ucf')
             if ucf_pos == -1:
@@ -1235,10 +1234,13 @@ class CC3200Connection(object):
             ucf_len_bytes = data[ucf_pos: ucf_pos + 4]
             ucf_len = int.from_bytes(ucf_len_bytes, byteorder='little') + 0x0c
             data = data[ucf_pos: ucf_pos + ucf_len]
+            image_ext = 'ucf'
 
         data_len = len(data)
-        if data_len != int.from_bytes(data[0:4], byteorder='little') + 0x0c:
-            log.info('FS programming aborted, incorrect UCF structure length.')
+        ucf_len = int.from_bytes(data[0:4], byteorder='little') + 0x0c
+        if image_ext == 'ucf' and data_len != ucf_len:
+            log.info('FS programming aborted, incorrect UCF structure length. '
+                     f'data length {data_len:,} bytes, UCF length {ucf_len:,} bytes.')
             return
 
         if self.vinfo.bootloader[1] >= 4:
