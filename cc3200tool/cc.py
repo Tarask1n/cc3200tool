@@ -362,7 +362,7 @@ class CC3x00VersionInfo(object):
             self.bootloader, self.nwp, self.mac, self.phy, self.chip_type)
 
 
-class CC3x00MacInfo(object):
+class CC3xx0MacInfo(object):
     def __init__(self, mac: str, prog_mac: str):
         self.mac = mac
         self.prog_mac = prog_mac
@@ -372,7 +372,8 @@ class CC3x00MacInfo(object):
         return cls(mac.hex(':'), prog_mac.hex(':'))
 
     def __repr__(self):
-        return f'CC3x00MacInfo(MAC: {self.mac}, PROG_MAC: {self.prog_mac})'
+        return f'CC3xx0MacInfo(MAC: {self.mac or None}, ' \
+            f'PROG MAC: {self.prog_mac or None})'
 
 
 class CC3x00StorageList(object):
@@ -806,19 +807,20 @@ class CC3200Connection(object):
     def _get_mac_address(self):
         mac_data = [b'', b'']
         for ind in range(2):
+            prog_str = ('', 'PROG ')[ind]
             try:
                 self._send_packet(OPCODE_GET_MAC_ADDRESS + int.to_bytes(
                     ind, 4, byteorder='big'), timeout=5)
-                mac_data[ind] = self._read_packet()
+                mac_data[ind] = self._read_packet(timeout=5)
             except CC3200Error:
-                log.info(f"Could not read MAC{('', ' PROD')[ind]} from device")
+                log.info(f"Could not read {prog_str}MAC from device")
                 mac_data[ind] = b''
             else:
                 if len(mac_data[ind]) != 6:
-                    log.info(f"MAC{('', ' PROD')[ind]} info should be 6 bytes, got "
+                    log.info(f"{prog_str}MAC info should be 6 bytes, got "
                              f"{len(mac_data[ind])}. {mac_data[ind].hex(' ')}")
                     mac_data[ind] = b''
-        return CC3x00MacInfo.from_bytes(*mac_data)
+        return CC3xx0MacInfo.from_bytes(*mac_data)
 
     def _get_storage_list(self):
         log.info("Getting storage list...")
